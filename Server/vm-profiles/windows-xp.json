@@ -1,0 +1,10 @@
+{
+  "id": "winxp-target",
+  "display_name": "Windows XP",
+  "disk_image_name": "winxp.qcow2",
+  "xml_template": "templates/winxp_template.xml",
+  "os_family": "windows",
+  "target_ip": "10.10.10.50",
+  "target_mac": "52:54:00:11:22:33",
+  "recommended_strategies": ["IP_FRAGMENTATION"]
+}

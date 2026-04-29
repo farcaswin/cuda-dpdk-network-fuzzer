@@ -1,0 +1,7 @@
+{
+  "vm_storage_dir": "/var/lib/libvirt/images/fuzzer_vms",
+  "vm_profiles_dir": "vm-profiles",
+  "vm_templates_dir": "vm-profiles/templates",
+  "libvirt_network": "fuzz-net",
+  "default_snapshot_prefix": "pre-fuzz-"
+}

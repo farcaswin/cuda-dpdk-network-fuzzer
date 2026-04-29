@@ -1,5 +1,8 @@
-#include "Logger.h"
 #include "HttpSrv.h"
+#include "routing/VMRoutes.h"
+#include "VMService.h"
+#include "ConfigManager.h"
+#include "Logger.h"
 #include <iostream>
 #include <csignal>
 
@@ -19,13 +22,20 @@ int main(int argc, char** argv) {
         spdlog::level::debug
     );
 
-    LOG_INFO("Fuzzer Server Started");
+    LOG_INFO("FUZZER SERVER VM ORCHESTRATION STARTED");
 
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
+    // Load configuration
+    ConfigManager::instance().load("config.json");
+
+    VMService vm_service;
+
     HttpSrv server("0.0.0.0", 8080);
     g_server = &server;
+
+    server.add_route_group(std::make_unique<VMRoutes>(vm_service));
 
     LOG_INFO("Server started on port 8080");
     server.start();
