@@ -1,0 +1,54 @@
+# --- C++ / CMake ---
+**/build/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/Makefile
+**/*.a
+**/*.o
+**/*.so
+**/*.lib
+**/*.dll
+**/*.exe
+**/fuzzer-srv
+
+# --- Python ---
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.env
+**/.venv/
+**/env/
+**/venv/
+**/cl_vnv/
+
+# --- Visual Studio / VS Code ---
+**/.vs/
+**/*.sln
+**/*.vcxproj
+**/*.vcxproj.filters
+**/*.vcxproj.user
+**/*.suo
+**/*.db
+**/*.opendb
+**/.vscode/
+**/ipch/
+**/bin/
+**/obj/
+
+# --- Logs & Artifacts ---
+**/logs/*.log
+**/*.swp
+**/*.swo
+**/.DS_Store
+
+# --- CUDA ---
+**/*.ptx
+**/*.cubin
+**/*.fatbin
+
+GEMINI.md
+Documentatie.md
+thesis-setup.md
+Client/
