@@ -23,11 +23,15 @@ target_include_directories(nlohmann_json INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/external/json
 )
 
+add_subdirectory(src/domain)
+add_subdirectory(src/api)
 add_subdirectory(src/utils)
 
 add_executable(fuzzer-srv main.cpp)
 
 target_link_libraries(fuzzer-srv PRIVATE 
     utils_lib
+    api_lib
+    domain_lib
     spdlog::spdlog_header_only
 )
