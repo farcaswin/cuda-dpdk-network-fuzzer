@@ -4,6 +4,7 @@ pkg_check_modules(DPDK REQUIRED libdpdk)
 add_library(fuzzing_lib STATIC
     DpdkSender.cpp
     PacketBuffer.cpp
+    FuzzEngine.cpp
     kernels/IcmpFuzzStrategy.cu
     kernels/IpHeaderFuzzStrategy.cu
     kernels/TcpFuzzStrategy.cu

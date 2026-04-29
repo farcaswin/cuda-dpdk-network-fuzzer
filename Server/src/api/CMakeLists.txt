@@ -4,6 +4,8 @@ add_library(api_lib STATIC
     RouteGroup.h
     routing/VMRoutes.h
     routing/VMRoutes.cpp
+    routing/FuzzRoutes.h
+    routing/FuzzRoutes.cpp
 )
 
 target_include_directories(api_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

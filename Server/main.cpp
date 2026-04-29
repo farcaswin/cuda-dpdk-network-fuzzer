@@ -4,6 +4,8 @@
 #include "ConfigManager.h"
 #include "Logger.h"
 #include "DpdkSender.h"
+#include "FuzzService.h"
+#include "routing/FuzzRoutes.h"
 #include <iostream>
 #include <csignal>
 
@@ -23,7 +25,7 @@ int main(int argc, char** argv) {
         spdlog::level::debug
     );
 
-    LOG_INFO("FUZZER SERVER DPDK INTEGRATED STARTED");
+    LOG_INFO("FUZZER SERVER FULLY ORCHESTRATED STARTED");
 
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
@@ -55,11 +57,13 @@ int main(int argc, char** argv) {
     ConfigManager::instance().load("config.json");
 
     VMService vm_service;
+    fuzzer::FuzzService fuzz_service(dpdk_sender);
 
     HttpSrv server("0.0.0.0", 8080);
     g_server = &server;
 
     server.add_route_group(std::make_unique<VMRoutes>(vm_service));
+    server.add_route_group(std::make_unique<fuzzer::FuzzRoutes>(fuzz_service));
 
     LOG_INFO("Server started on port 8080");
     server.start();
