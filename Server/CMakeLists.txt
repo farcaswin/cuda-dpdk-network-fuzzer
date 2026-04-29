@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
-project(FuzzerServer CXX)
+project(FuzzerServer CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Find CUDA Toolkit
+find_package(CUDAToolkit REQUIRED)
 
 include(FetchContent)
 
@@ -28,6 +31,7 @@ add_subdirectory(src/config)
 add_subdirectory(src/services)
 add_subdirectory(src/api)
 add_subdirectory(src/utils)
+add_subdirectory(src/fuzzing)
 
 add_executable(fuzzer-srv main.cpp)
 
@@ -37,5 +41,7 @@ target_link_libraries(fuzzer-srv PRIVATE
     service_lib
     domain_lib
     config_lib
+    fuzzing_lib
     spdlog::spdlog_header_only
+    CUDA::cudart
 )
