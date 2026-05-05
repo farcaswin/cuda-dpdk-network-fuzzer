@@ -13,12 +13,14 @@ void FuzzRoutes::register_routes(httplib::Server& svr) {
         try {
             auto body = json::parse(req.body);
             FuzzParams params;
+            params.vm_id = body.at("vm_id").get<std::string>();
             params.target_ip = body.at("target_ip").get<std::string>();
             params.target_mac = body.at("target_mac").get<std::string>();
             params.src_ip = body.value("src_ip", "10.10.10.1"); // Default host IP in fuzz-net
             params.src_mac = body.value("src_mac", "00:00:00:00:00:00"); 
             params.strategy = body.at("strategy").get<std::string>();
             params.batch_size = body.value("batch_size", 65536);
+            params.auto_restore = body.value("auto_restore", false);
 
             service_.start_fuzzing(params);
             res.set_content(json{{"status", "success"}, {"message", "Fuzzing started"}}.dump(), "application/json");

@@ -1,0 +1,13 @@
+{
+    "id": "openwrt",
+    "display_name": "OpenWRT 23.05 (x86_64)",
+    "description": "OpenWRT router firmware for x86. Primary target for network stack and firewall fuzzing.",
+    "os_family": "linux",
+    "target_ip": "10.10.10.50",
+    "target_mac": "52:54:00:10:10:50",
+    "recommended_strategies": ["ICMP_TYPES", "IP_HEADER", "TCP_FLAGS"],
+    "disk_image_name": "openwrt.qcow2",
+    "xml_template": "openwrt_template.xml",
+    "memory_mb": 512,
+    "vcpus": 1
+}

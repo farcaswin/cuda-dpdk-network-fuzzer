@@ -1,0 +1,13 @@
+{
+    "id": "alpine",
+    "display_name": "Alpine Linux 3.19",
+    "description": "Minimalistic and modern Linux distribution. Uses musl libc and busybox. Excellent for testing modern TCP/IP stack performance.",
+    "os_family": "linux",
+    "target_ip": "10.10.10.62",
+    "target_mac": "52:54:00:10:10:62",
+    "recommended_strategies": ["ICMP_TYPES", "TCP_FLAGS", "IP_HEADER"],
+    "disk_image_name": "alpine.qcow2",
+    "xml_template": "linux_virtio_template.xml",
+    "memory_mb": 256,
+    "vcpus": 1
+}

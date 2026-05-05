@@ -5,6 +5,7 @@ add_library(fuzzing_lib STATIC
     DpdkSender.cpp
     PacketBuffer.cpp
     FuzzEngine.cpp
+    TargetMonitor.cpp
     kernels/IcmpFuzzStrategy.cu
     kernels/IpHeaderFuzzStrategy.cu
     kernels/TcpFuzzStrategy.cu

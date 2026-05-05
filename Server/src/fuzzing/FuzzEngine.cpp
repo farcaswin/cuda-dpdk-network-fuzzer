@@ -20,6 +20,11 @@ void FuzzEngine::start(std::unique_ptr<IFuzzStrategy> strategy, uint32_t batch_s
     batch_size_ = batch_size;
     buffer_ = std::make_unique<PacketBuffer>(batch_size_);
     
+    // Reset stats for new session
+    stats_.packets_sent = 0;
+    stats_.current_pps = 0.0;
+    stats_.target_alive = true;
+
     running_ = true;
     worker_thread_ = std::thread(&FuzzEngine::loop, this);
     

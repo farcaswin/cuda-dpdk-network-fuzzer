@@ -1,0 +1,52 @@
+<domain type='kvm'>
+  <name>{{VM_NAME}}</name>
+  <memory unit='KiB'>{{MEMORY_KB}}</memory>
+  <vcpu placement='static'>{{VCPUS}}</vcpu>
+
+  <os>
+    <type arch='i686' machine='pc'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+
+  <features>
+    <acpi/>
+    <apic/>
+    <pae/>
+  </features>
+
+  <cpu mode='host-passthrough' check='none'/>
+
+  <clock offset='utc'/>
+
+  <devices>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' cache='unsafe'/>
+      <source file='{{DISK_PATH}}'/>
+      <!-- Folosim IDE pentru compatibilitate cu kernel 2.6 -->
+      <target dev='hda' bus='ide'/>
+    </disk>
+
+    <interface type='network'>
+      <mac address='{{TARGET_MAC}}'/>
+      <source network='fuzz-net'/>
+      <!-- Folosim e1000 (Intel) - suportat nativ de Ubuntu 8.04 -->
+      <model type='e1000'/>
+    </interface>
+
+    <serial type='pty'>
+      <target type='isa-serial' port='0'/>
+    </serial>
+    <console type='pty'>
+      <target type='serial' port='0'/>
+    </console>
+
+    <video>
+      <model type='vga' vram='16384' heads='1' primary='yes'/>
+    </video>
+    
+    <input type='tablet' bus='usb'/>
+    <graphics type='vnc' port='-1' autoport='yes' listen='0.0.0.0'>
+      <listen type='address' address='0.0.0.0'/>
+    </graphics>
+  </devices>
+</domain>

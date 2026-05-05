@@ -1,0 +1,13 @@
+{
+    "id": "vyos-router",
+    "display_name": "VyOS 1.4 (Rolling)",
+    "description": "VyOS network operating system. Professional routing and firewall target with VirtIO support.",
+    "os_family": "linux",
+    "target_ip": "10.10.10.61",
+    "target_mac": "52:54:00:10:10:61",
+    "recommended_strategies": ["TCP_FLAGS", "IP_HEADER", "ICMP_TYPES"],
+    "disk_image_name": "vyos.qcow2",
+    "xml_template": "linux_virtio_template.xml",
+    "memory_mb": 1024,
+    "vcpus": 1
+}

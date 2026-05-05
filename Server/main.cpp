@@ -1,11 +1,11 @@
 #include "HttpSrv.h"
-#include "routing/VMRoutes.h"
 #include "VMService.h"
 #include "ConfigManager.h"
 #include "Logger.h"
 #include "DpdkSender.h"
 #include "FuzzService.h"
 #include "routing/FuzzRoutes.h"
+#include "routing/VMRoutes.h"
 #include <iostream>
 #include <csignal>
 
@@ -25,8 +25,9 @@ int main(int argc, char** argv) {
         spdlog::level::debug
     );
 
-    LOG_INFO("FUZZER SERVER FULLY ORCHESTRATED STARTED");
+    LOG_INFO("FUZZER SERVER STARTED");
 
+    // Signal handlers for os signal
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
@@ -40,7 +41,7 @@ int main(int argc, char** argv) {
             argv[0],
             "--vdev=net_tap0,iface=dpdk0",
             "--lcores=0",
-            "--log-level=lib.eal:6",
+            "--log-level=lib.eal:6", // Reduce spam from EAL
             "--"
         };
         int auto_argc = sizeof(auto_argv) / sizeof(auto_argv[0]);
@@ -57,7 +58,7 @@ int main(int argc, char** argv) {
     ConfigManager::instance().load("config.json");
 
     VMService vm_service;
-    fuzzer::FuzzService fuzz_service(dpdk_sender);
+    fuzzer::FuzzService fuzz_service(dpdk_sender, vm_service);
 
     HttpSrv server("0.0.0.0", 8080);
     g_server = &server;

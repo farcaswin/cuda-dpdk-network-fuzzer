@@ -1,0 +1,13 @@
+{
+    "id": "metasploitable2",
+    "display_name": "Metasploitable 2",
+    "description": "Intentionally vulnerable Linux VM. Ideal for testing various network exploits and DoS strategies.",
+    "os_family": "linux",
+    "target_ip": "10.10.10.63",
+    "target_mac": "52:54:00:10:10:63",
+    "recommended_strategies": ["TCP_FLAGS", "IP_FRAGMENTATION", "ICMP_TYPES"],
+    "disk_image_name": "metasploitable2.qcow2",
+    "xml_template": "linux_legacy_template.xml",
+    "memory_mb": 512,
+    "vcpus": 1
+}

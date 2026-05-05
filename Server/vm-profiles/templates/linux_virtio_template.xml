@@ -1,0 +1,54 @@
+<domain type='kvm'>
+  <name>{{VM_NAME}}</name>
+  <memory unit='KiB'>{{MEMORY_KB}}</memory>
+  <vcpu placement='static'>{{VCPUS}}</vcpu>
+
+  <os>
+    <type arch='x86_64' machine='q35'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+
+  <features>
+    <acpi/>
+    <apic/>
+    <pae/>
+  </features>
+
+  <cpu mode='host-passthrough' check='none'/>
+
+  <clock offset='utc'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+
+  <devices>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' cache='unsafe' io='threads'/>
+      <source file='{{DISK_PATH}}'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+
+    <interface type='network'>
+      <mac address='{{TARGET_MAC}}'/>
+      <source network='fuzz-net'/>
+      <model type='virtio'/>
+    </interface>
+
+    <serial type='pty'>
+      <target type='isa-serial' port='0'/>
+    </serial>
+    <console type='pty'>
+      <target type='serial' port='0'/>
+    </console>
+
+    <video>
+      <model type='vga' vram='16384' heads='1' primary='yes'/>
+    </video>
+    
+    <input type='tablet' bus='usb'/>
+    <graphics type='vnc' port='-1' autoport='yes' listen='0.0.0.0'>
+      <listen type='address' address='0.0.0.0'/>
+    </graphics>
+  </devices>
+</domain>
