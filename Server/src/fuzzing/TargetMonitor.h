@@ -14,7 +14,7 @@ public:
     /**
      * @brief Start monitoring the target.
      * @param target_ip IP to ping
-     * @param interface Network interface to use (e.g. virbr1)
+     * @param interface Network interface to use
      * @param on_crash Callback when target is down
      */
     void start(const std::string& target_ip, const std::string& interface, std::function<void()> on_crash);

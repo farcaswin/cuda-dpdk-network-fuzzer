@@ -56,24 +56,26 @@ void FuzzService::start_fuzzing(const FuzzParams& params) {
     engine_.start(std::move(strategy), params.batch_size);
 
     if (params.auto_restore) {
-        // We use virbr1 as the default bridge interface for fuzz-net
         monitor_.start(params.target_ip, "virbr1", [this, params]() {
             LOG_CRITICAL("CRASH CALLBACK TRIGGERED for VM {}", params.vm_id);
-            this->engine_.stop();
             
-            // Mark target as dead in engine stats for UI reporting
-            this->engine_.get_stats().target_alive = false;
-
-            try {
-                LOG_INFO("Initiating auto-restore for VM {}...", params.vm_id);
-                this->vm_service_.restore_snapshot(params.vm_id, "");
-                LOG_INFO("Auto-restore successful for VM {}", params.vm_id);
+            // Run recovery in a separate thread to avoid deadlocking TargetMonitor/FuzzEngine join
+            std::thread([this, params]() {
+                // 1. Mark target as dead for UI
+                this->engine_.get_stats().target_alive = false;
                 
-                // Optional: We could automatically restart the VM here if restore doesn't start it
-                // but restore_snapshot --revert usually handles state.
-            } catch (const std::exception& e) {
-                LOG_ERROR("Auto-restore failed for VM {}: {}", params.vm_id, e.what());
-            }
+                // 2. Stop everything
+                this->engine_.stop();
+                this->monitor_.stop();
+
+                try {
+                    LOG_INFO("Initiating auto-restore for VM {}...", params.vm_id);
+                    this->vm_service_.restore_snapshot(params.vm_id, "");
+                    LOG_INFO("Auto-restore successful for VM {}", params.vm_id);
+                } catch (const std::exception& e) {
+                    LOG_ERROR("Auto-restore failed for VM {}: {}", params.vm_id, e.what());
+                }
+            }).detach();
         });
     }
 }

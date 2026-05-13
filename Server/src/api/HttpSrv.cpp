@@ -27,6 +27,12 @@ void HttpSrv::setup_global_handlers(){
         } 
     );
 
+    // Health API
+    server_.Get("/api/system/health", [](const httplib::Request&, httplib::Response& res) {
+        res.status = 200;
+        res.set_content(nlohmann::json{{"status", "ok"}}.dump() + "\n", "application/json");
+    });
+
     // Shutdown API
     server_.Post("/api/system/shutdown", [this](const httplib::Request&, httplib::Response& res) {
         LOG_INFO("Shutdown request received via API");
