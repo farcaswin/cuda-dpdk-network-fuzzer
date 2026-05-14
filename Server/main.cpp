@@ -4,8 +4,10 @@
 #include "Logger.h"
 #include "DpdkSender.h"
 #include "FuzzService.h"
+#include "NotificationHub.h"
 #include "routing/FuzzRoutes.h"
 #include "routing/VMRoutes.h"
+#include "routing/TelemetryRoutes.h"
 #include <iostream>
 #include <csignal>
 
@@ -57,14 +59,17 @@ int main(int argc, char** argv) {
     // Load configuration
     ConfigManager::instance().load("config.json");
 
+    fuzzer::NotificationHub notification_hub;
+    
     VMService vm_service;
-    fuzzer::FuzzService fuzz_service(dpdk_sender, vm_service);
+    fuzzer::FuzzService fuzz_service(dpdk_sender, vm_service, notification_hub);
 
     HttpSrv server("0.0.0.0", 8080);
     g_server = &server;
 
     server.add_route_group(std::make_unique<VMRoutes>(vm_service));
     server.add_route_group(std::make_unique<fuzzer::FuzzRoutes>(fuzz_service));
+    server.add_route_group(std::make_unique<fuzzer::TelemetryRoutes>(notification_hub));
 
     LOG_INFO("Server started on port 8080");
     server.start();

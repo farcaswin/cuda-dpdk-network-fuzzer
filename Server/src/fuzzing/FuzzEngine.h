@@ -4,6 +4,7 @@
 #include "PacketBuffer.h"
 #include "DpdkSender.h"
 #include "IFuzzStrategy.h"
+#include "NotificationHub.h"
 #include <atomic>
 #include <thread>
 #include <memory>
@@ -19,7 +20,7 @@ struct FuzzStats {
 
 class FuzzEngine {
 public:
-    FuzzEngine(DpdkSender& dpdk_sender);
+    FuzzEngine(DpdkSender& dpdk_sender, NotificationHub& hub);
     ~FuzzEngine();
 
     /**
@@ -27,7 +28,7 @@ public:
      * @param strategy The strategy to use
      * @param batch_size Number of packets per macro-batch
      */
-    void start(std::unique_ptr<IFuzzStrategy> strategy, uint32_t batch_size = 65536);
+    void start(std::unique_ptr<IFuzzStrategy> strategy, uint32_t batch_size = 65536, uint32_t rate_pps = 0, uint32_t duration_sec = 0);
 
     /**
      * @brief Stop the fuzzing process.
@@ -42,9 +43,12 @@ private:
     void loop();
 
     DpdkSender& dpdk_sender_;
+    NotificationHub& hub_;
     std::unique_ptr<PacketBuffer> buffer_;
     std::unique_ptr<IFuzzStrategy> strategy_;
     uint32_t batch_size_ = 0;
+    uint32_t rate_pps_ = 0;
+    uint32_t duration_sec_ = 0;
 
     std::thread worker_thread_;
     std::atomic<bool> running_{false};

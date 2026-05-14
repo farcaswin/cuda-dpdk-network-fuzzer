@@ -7,6 +7,7 @@ from client.api.client import ApiClient
 from client.api.models import VMProfile, VMStatus
 from client.workers.api_worker import ApiWorker
 from client.workers.poll_worker import PollWorker
+import qtawesome as qta
 
 class VMPanel(QWidget):
     vm_selected = pyqtSignal(str)              # vm_id
@@ -36,7 +37,8 @@ class VMPanel(QWidget):
         label.setObjectName("section_header")
         header_layout.addWidget(label)
         
-        self.refresh_btn = QPushButton("⟳")
+        self.refresh_btn = QPushButton()
+        self.refresh_btn.setIcon(qta.icon('fa5s.sync'))
         self.refresh_btn.setFixedWidth(30)
         self.refresh_btn.clicked.connect(self.refresh_profiles)
         header_layout.addWidget(self.refresh_btn)

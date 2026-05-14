@@ -232,8 +232,10 @@ uint32_t DpdkSender::send_burst(const uint8_t* packet_data, const uint16_t* pack
             uint16_t len = packet_lengths[global_idx];
             
             // Safety check for length
-            if (len > MAX_PACKET_SIZE || len == 0) {
-                len = MAX_PACKET_SIZE; 
+            if (len == 0 || len > MAX_PACKET_SIZE) {
+                // LOG_WARN("Invalid packet length ({}). Skipping packet {}.", len, global_idx);
+                rte_pktmbuf_free(mbufs[j]); // Free the mbuf since it won't be sent
+                continue; // Skip this mbuf in the current burst
             }
 
             // Calculate offset in the giant pinned memory buffer
@@ -245,11 +247,16 @@ uint32_t DpdkSender::send_burst(const uint8_t* packet_data, const uint16_t* pack
                 rte_memcpy(dst, src, len);
             } else {
                 LOG_ERROR("Failed to append {} bytes to mbuf", len);
+                rte_pktmbuf_free(mbufs[j]); // Free the mbuf on append failure
+                continue; // Skip this mbuf
             }
         }
 
         // 3. Transmit the burst
         uint16_t sent = rte_eth_tx_burst(port_id_, 0, mbufs, current_burst_size);
+        // if (sent > 0) {
+        //     LOG_DEBUG("DPDK: Sent {} packets in burst.", sent);
+        // }
         total_sent += sent;
 
         // 4. Free mbufs that were not sent (TX ring full)
@@ -261,6 +268,17 @@ uint32_t DpdkSender::send_burst(const uint8_t* packet_data, const uint16_t* pack
     }
 
     return total_sent;
+}
+
+std::string DpdkSender::get_mac_address() const {
+    if (!initialized_) {
+        return "00:00:00:00:00:00"; // Return a default invalid MAC if not initialized
+    }
+    struct rte_ether_addr mac_addr;
+    rte_eth_macaddr_get(port_id_, &mac_addr);
+    char buf[RTE_ETHER_ADDR_FMT_SIZE];
+    rte_ether_format_addr(buf, RTE_ETHER_ADDR_FMT_SIZE, &mac_addr);
+    return std::string(buf);
 }
 
 } // namespace fuzzer

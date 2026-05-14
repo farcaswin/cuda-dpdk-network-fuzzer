@@ -1,9 +1,9 @@
 #pragma once
-#include <httplib.h>
+#include <crow.h>
 
 class RouteGroup{
 public:
     virtual ~RouteGroup() = default;
 
-    virtual void register_routes(httplib::Server& svr) = 0;
+    virtual void register_routes(crow::SimpleApp& app) = 0;
 };

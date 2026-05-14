@@ -9,8 +9,8 @@
 
 namespace fuzzer {
 
-FuzzService::FuzzService(DpdkSender& dpdk_sender, VMService& vm_service) 
-    : dpdk_sender_(dpdk_sender), vm_service_(vm_service), engine_(dpdk_sender) {}
+FuzzService::FuzzService(DpdkSender& dpdk_sender, VMService& vm_service, NotificationHub& hub) 
+    : dpdk_sender_(dpdk_sender), vm_service_(vm_service), hub_(hub), engine_(dpdk_sender, hub) {}
 
 void FuzzService::start_fuzzing(const FuzzParams& params) {
     if (engine_.is_running()) {
@@ -25,7 +25,14 @@ void FuzzService::start_fuzzing(const FuzzParams& params) {
     uint8_t dest_mac[6];
     uint8_t src_mac[6];
     mac_to_array(params.target_mac, dest_mac);
-    mac_to_array(params.src_mac, src_mac);
+    
+    // Auto-detect src_mac if not provided or if it's the default all-zeros MAC
+    std::string final_src_mac_str = params.src_mac;
+    if (final_src_mac_str == "00:00:00:00:00:00" || final_src_mac_str.empty()) {
+        final_src_mac_str = dpdk_sender_.get_mac_address();
+        LOG_INFO("Using auto-detected source MAC: {}", final_src_mac_str);
+    }
+    mac_to_array(final_src_mac_str, src_mac);
 
     if (params.strategy == "ICMP_TYPES") {
         IcmpFuzzStrategy::Config cfg;
@@ -47,17 +54,20 @@ void FuzzService::start_fuzzing(const FuzzParams& params) {
         memcpy(cfg.src_mac, src_mac, 6);
         cfg.dest_ip = dest_ip;
         cfg.src_ip = src_ip;
-        cfg.dest_port_base = 0;
+        cfg.dest_port_base = params.target_port;
         strategy = std::make_unique<TcpFuzzStrategy>(cfg);
     } else {
         throw std::runtime_error("Unknown strategy: " + params.strategy);
     }
 
-    engine_.start(std::move(strategy), params.batch_size);
+    engine_.start(std::move(strategy), params.batch_size, params.rate_pps, params.duration_sec);
 
     if (params.auto_restore) {
         monitor_.start(params.target_ip, "virbr1", [this, params]() {
             LOG_CRITICAL("CRASH CALLBACK TRIGGERED for VM {}", params.vm_id);
+            
+            // Broadcast crash to listeners
+            this->hub_.send_crash(params.vm_id);
             
             // Run recovery in a separate thread to avoid deadlocking TargetMonitor/FuzzEngine join
             std::thread([this, params]() {

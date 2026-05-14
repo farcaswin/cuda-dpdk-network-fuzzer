@@ -32,6 +32,12 @@ public:
      * @brief Check if DPDK is initialized.
      */
     bool is_initialized() const { return initialized_; }
+    
+    /**
+     * @brief Get the MAC address of the DPDK port.
+     * @return MAC address as a string (e.g., "00:11:22:33:44:55")
+     */
+    std::string get_mac_address() const; 
 
     /**
      * @brief Sends a large batch of packets by splitting it into micro-bursts.
@@ -64,7 +70,7 @@ private:
      * @brief Connect a TAP interface to a Linux bridge.
      */
     void setup_bridge_link(const std::string& tap_iface, const std::string& bridge_name);
-
+private:
     struct rte_mempool* mempool_ = nullptr;
     uint16_t port_id_ = 0;
     bool initialized_ = false;

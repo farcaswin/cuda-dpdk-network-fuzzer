@@ -8,7 +8,7 @@ from client.widgets.flow_panel import FlowPanel
 from client.widgets.toolbar import AppToolbar
 from client.config import THEME
 from client.style import get_stylesheet
-from client.workers.packet_flow_worker import PacketFlowWorker
+from client.workers.telemetry_worker import TelemetryWorker
 from client.api.client import ApiClient
 from client.workers.api_worker import ApiWorker
 
@@ -20,7 +20,7 @@ class MainWindow(QMainWindow):
         
         # Internal state
         self._workers = []
-        self._flow_worker = None
+        self._telemetry_worker = None
         
         # Apply global stylesheet
         self.setStyleSheet(get_stylesheet())
@@ -87,17 +87,30 @@ class MainWindow(QMainWindow):
         self.vm_panel.setEnabled(True)
         self.fuzz_panel.setEnabled(True)
         self.flow_panel.setEnabled(True)
-        self.statusBar().showMessage("Connected to FuzzerServer")
-        self.flow_panel.add_log_entry("INFO", "Connected to server")
-        self.vm_panel.refresh_profiles()
+        self.statusBar().showMessage("Connecting to Telemetry...")
+        
+        if not self._telemetry_worker:
+            # Start telemetry connection
+            self._telemetry_worker = TelemetryWorker()
+            self._telemetry_worker.connected.connect(lambda: self.toolbar.set_connected_state(True))
+            self._telemetry_worker.disconnected.connect(lambda: self.toolbar.set_connected_state(False))
+            self._telemetry_worker.stats_update.connect(self.fuzz_panel.update_stats)
+            self._telemetry_worker.stats_update.connect(self.flow_panel.update_stats)
+            self._telemetry_worker.crash_detected.connect(self.fuzz_panel.on_crash)
+            self._telemetry_worker.crash_detected.connect(self._on_crash)
+            self._telemetry_worker.log_received.connect(self.flow_panel.add_log_entry)
+            self._telemetry_worker.start()
+            self._workers.append(self._telemetry_worker)
 
     def _on_disconnected(self):
         self.vm_panel.setEnabled(False)
         self.fuzz_panel.setEnabled(False)
         self.flow_panel.setEnabled(False)
         self.statusBar().showMessage("Disconnected from server")
-        if self._flow_worker:
-            self._on_fuzz_stopped()
+        if self._telemetry_worker:
+            self._telemetry_worker.cancel()
+            self._telemetry_worker = None
+        self.toolbar.set_connected_state(False)
 
     def _on_shutdown(self):
         self.flow_panel.add_log_entry("INFO", "Server shutdown requested...")
@@ -106,32 +119,20 @@ class MainWindow(QMainWindow):
     def _on_fuzz_started(self, config):
         self.statusBar().showMessage(f"FUZZING ACTIVE: {config['strategy']} @ {config['rate_pps']:,} PPS")
         self.flow_panel.add_log_entry("INFO", f"Fuzzing session started: {config['strategy']}")
-        
-        # Start high-frequency stats polling
-        self._flow_worker = PacketFlowWorker()
-        self._flow_worker.stats_update.connect(self.fuzz_panel.update_stats)
-        self._flow_worker.stats_update.connect(self.flow_panel.update_stats)
-        self._flow_worker.crash_detected.connect(self.fuzz_panel.on_crash)
-        self._flow_worker.crash_detected.connect(self._on_crash)
-        self._flow_worker.start()
-        self._workers.append(self._flow_worker)
 
     def _on_fuzz_stopped(self):
         self.statusBar().showMessage("Fuzzing stopped")
         self.flow_panel.add_log_entry("INFO", "Fuzzing session stopped")
-        if self._flow_worker:
-            self._flow_worker.cancel()
-            self._flow_worker = None
 
-    def _on_crash(self):
-        self.statusBar().showMessage("⚠️ TARGET CRASHED!")
-        self.flow_panel.add_log_entry("CRASH", "Network stack crash detected on target!")
+    def _on_crash(self, vm_id=""):
+        self.statusBar().showMessage(f"TARGET CRASHED: {vm_id}!")
+        self.flow_panel.add_log_entry("CRASH", f"Network stack crash detected on {vm_id}!")
         QApplication.beep()
 
     def closeEvent(self, event):
         # Clean up workers before closing
-        if self._flow_worker:
-            self._flow_worker.cancel()
+        if self._telemetry_worker:
+            self._telemetry_worker.cancel()
         
         for worker in self._workers:
             if worker.isRunning():

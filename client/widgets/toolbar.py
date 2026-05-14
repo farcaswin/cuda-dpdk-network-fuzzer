@@ -68,55 +68,28 @@ class AppToolbar(QWidget):
             self.stop_connection()
 
     def start_connection(self):
-        print("DEBUG: Starting connection...")
+        print("DEBUG: Connection requested...")
         self.status_indicator.setText("● Connecting...")
         self.status_indicator.setStyleSheet(f"color: {THEME['yellow']}; font-weight: bold; margin-right: 10px;")
         self.connect_btn.setEnabled(False)
-        
-        # Start health polling
-        self._health_worker = PollWorker(ApiClient.get_health, POLL_INTERVALS["server_health"])
-        self._health_worker.update.connect(self._on_health_update)
-        self._health_worker.error.connect(self._on_health_error)
-        self._health_worker.start()
-        # Ensure reference to prevent GC
-        self._workers.append(self._health_worker)
+        self.connected.emit() # This will notify MainWindow to start TelemetryWorker
 
-    def stop_connection(self):
-        print("DEBUG: Stopping connection...")
-        if self._health_worker:
-            self._health_worker.cancel()
-            self._health_worker = None
-        
-        self._is_connected = False
-        self.status_indicator.setText("● Disconnected")
-        self.status_indicator.setStyleSheet(f"color: {THEME['red']}; font-weight: bold; margin-right: 10px;")
-        self.connect_btn.setText("Connect")
-        self.connect_btn.setEnabled(True)
-        self.disconnected.emit()
-
-    def _on_health_update(self, data):
-        print(f"DEBUG: Health update: {data}")
-        if not self._is_connected:
-            self._is_connected = True
+    def set_connected_state(self, is_connected: bool):
+        self._is_connected = is_connected
+        if is_connected:
             self.status_indicator.setText("● Connected")
             self.status_indicator.setStyleSheet(f"color: {THEME['green']}; font-weight: bold; margin-right: 10px;")
             self.connect_btn.setText("Disconnect")
-            self.connect_btn.setEnabled(True)
-            self.connected.emit()
-
-    def _on_health_error(self, err):
-        # We print error only when we are NOT connected to avoid spamming console
-        # but for debug, we print it once if we were expecting connection
-        if not self._is_connected:
-             print(f"DEBUG: Health error during connecting: {err}")
-        
-        if self._is_connected:
-            print(f"DEBUG: Connection lost: {err}")
-            self._is_connected = False
+        else:
             self.status_indicator.setText("● Disconnected")
             self.status_indicator.setStyleSheet(f"color: {THEME['red']}; font-weight: bold; margin-right: 10px;")
             self.connect_btn.setText("Connect")
-            self.disconnected.emit()
+        self.connect_btn.setEnabled(True)
+
+    def stop_connection(self):
+        print("DEBUG: Disconnection requested...")
+        self.set_connected_state(False)
+        self.disconnected.emit() # This will notify MainWindow to stop TelemetryWorker
 
     def confirm_shutdown(self):
         reply = QMessageBox.question(

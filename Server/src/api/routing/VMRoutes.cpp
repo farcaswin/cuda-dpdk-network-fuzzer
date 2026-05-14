@@ -4,31 +4,51 @@
 
 VMRoutes::VMRoutes(VMService& vm_srv) : vm_service_(vm_srv) {}
 
-void VMRoutes::register_routes(httplib::Server& srv) {
-    srv.Get("/api/vm/profiles", [this](const auto& req, auto& res) { handle_get_profiles(req, res); });
-    srv.Post("/api/vm/profiles", [this](const auto& req, auto& res) { handle_create_profile(req, res); });
-    srv.Put("/api/vm/profiles/:id", [this](const auto& req, auto& res) { handle_update_profile(req, res); });
-    srv.Get("/api/vm/storage/disks", [this](const auto& req, auto& res) { handle_list_available_disks(req, res); });
+void VMRoutes::register_routes(crow::SimpleApp& app) {
+    CROW_ROUTE(app, "/api/vm/profiles").methods(crow::HTTPMethod::GET)
+    ([this](const crow::request& req) { return handle_get_profiles(req); });
+
+    CROW_ROUTE(app, "/api/vm/profiles").methods(crow::HTTPMethod::POST)
+    ([this](const crow::request& req) { return handle_create_profile(req); });
+
+    CROW_ROUTE(app, "/api/vm/profiles/<string>").methods(crow::HTTPMethod::PUT)
+    ([this](const crow::request& req, std::string id) { return handle_update_profile(req, id); });
+
+    CROW_ROUTE(app, "/api/vm/storage/disks").methods(crow::HTTPMethod::GET)
+    ([this](const crow::request& req) { return handle_list_available_disks(req); });
     
-    srv.Post("/api/vm/:id/define", [this](const auto& req, auto& res) { handle_define_vm(req, res); });
-    srv.Post("/api/vm/:id/start", [this](const auto& req, auto& res) { handle_start_vm(req, res); });
-    srv.Post("/api/vm/:id/stop", [this](const auto& req, auto& res) { handle_stop_vm(req, res); });
-    srv.Get("/api/vm/:id/status", [this](const auto& req, auto& res) { handle_get_status(req, res); });
-    srv.Post("/api/vm/:id/snapshot", [this](const auto& req, auto& res) { handle_create_snapshot(req, res); });
-    srv.Post("/api/vm/:id/restore", [this](const auto& req, auto& res) { handle_restore_snapshot(req, res); });
-    srv.Get("/api/vm/:id/snapshots", [this](const auto& req, auto& res) { handle_list_snapshots(req, res); });
+    CROW_ROUTE(app, "/api/vm/<string>/define").methods(crow::HTTPMethod::POST)
+    ([this](const crow::request& req, std::string id) { return handle_define_vm(req, id); });
+
+    CROW_ROUTE(app, "/api/vm/<string>/start").methods(crow::HTTPMethod::POST)
+    ([this](const crow::request& req, std::string id) { return handle_start_vm(req, id); });
+
+    CROW_ROUTE(app, "/api/vm/<string>/stop").methods(crow::HTTPMethod::POST)
+    ([this](const crow::request& req, std::string id) { return handle_stop_vm(req, id); });
+
+    CROW_ROUTE(app, "/api/vm/<string>/status").methods(crow::HTTPMethod::GET)
+    ([this](const crow::request& req, std::string id) { return handle_get_status(req, id); });
+
+    CROW_ROUTE(app, "/api/vm/<string>/snapshot").methods(crow::HTTPMethod::POST)
+    ([this](const crow::request& req, std::string id) { return handle_create_snapshot(req, id); });
+
+    CROW_ROUTE(app, "/api/vm/<string>/restore").methods(crow::HTTPMethod::POST)
+    ([this](const crow::request& req, std::string id) { return handle_restore_snapshot(req, id); });
+
+    CROW_ROUTE(app, "/api/vm/<string>/snapshots").methods(crow::HTTPMethod::GET)
+    ([this](const crow::request& req, std::string id) { return handle_list_snapshots(req, id); });
 }
 
-void VMRoutes::handle_get_profiles(const httplib::Request&, httplib::Response& res) {
+crow::response VMRoutes::handle_get_profiles(const crow::request&) {
     auto profiles = vm_service_.get_profiles();
     json j = json::array();
     for (const auto& p : profiles) {
         j.push_back(profile_to_json(p));
     }
-    res.set_content(j.dump(4) + "\n", "application/json");
+    return send_json(j);
 }
 
-void VMRoutes::handle_create_profile(const httplib::Request& req, httplib::Response& res) {
+crow::response VMRoutes::handle_create_profile(const crow::request& req) {
     try {
         auto j = json::parse(req.body);
         VMProfile p;
@@ -43,15 +63,14 @@ void VMRoutes::handle_create_profile(const httplib::Request& req, httplib::Respo
         if (j.contains("vcpus")) p.vcpus = j["vcpus"];
 
         vm_service_.create_profile(p);
-        res.set_content(json{{"status", "ok"}}.dump(4) + "\n", "application/json");
+        return send_json(json{{"status", "ok"}});
     } catch (const std::exception& e) {
-        send_error(res, 400, e.what());
+        return send_error(400, e.what());
     }
 }
 
-void VMRoutes::handle_update_profile(const httplib::Request& req, httplib::Response& res) {
+crow::response VMRoutes::handle_update_profile(const crow::request& req, std::string id) {
     try {
-        std::string id = req.path_params.at("id");
         auto j = json::parse(req.body);
         VMProfile p;
         p.id = id;
@@ -65,52 +84,48 @@ void VMRoutes::handle_update_profile(const httplib::Request& req, httplib::Respo
         if (j.contains("vcpus")) p.vcpus = j["vcpus"];
 
         vm_service_.update_profile(p);
-        res.set_content(json{{"status", "ok"}}.dump(4) + "\n", "application/json");
+        return send_json(json{{"status", "ok"}});
     } catch (const std::exception& e) {
-        send_error(res, 400, e.what());
+        return send_error(400, e.what());
     }
 }
 
-void VMRoutes::handle_list_available_disks(const httplib::Request&, httplib::Response& res) {
+crow::response VMRoutes::handle_list_available_disks(const crow::request&) {
     auto disks = vm_service_.list_available_disks();
-    res.set_content(json(disks).dump(4) + "\n", "application/json");
+    return send_json(json(disks));
 }
 
-void VMRoutes::handle_define_vm(const httplib::Request& req, httplib::Response& res) {
+crow::response VMRoutes::handle_define_vm(const crow::request& req, std::string id) {
     try {
-        std::string id = req.path_params.at("id");
         vm_service_.define_vm(id);
-        res.set_content(json{{"status", "ok"}, {"message", "VM defined"}}.dump(4) + "\n", "application/json");
+        return send_json(json{{"status", "ok"}, {"message", "VM defined"}});
     } catch (const ServiceException& e) {
-        send_error(res, e.error().http_status, e.error().message);
+        return send_error(e.error().http_status, e.error().message);
     } catch (const std::exception& e) {
-        send_error(res, 500, e.what());
+        return send_error(500, e.what());
     }
 }
 
-void VMRoutes::handle_start_vm(const httplib::Request& req, httplib::Response& res) {
+crow::response VMRoutes::handle_start_vm(const crow::request& req, std::string id) {
     try {
-        std::string id = req.path_params.at("id");
         vm_service_.start_vm(id);
-        res.set_content(json{{"status", "ok"}}.dump(4) + "\n", "application/json");
+        return send_json(json{{"status", "ok"}});
     } catch (const std::exception& e) {
-        send_error(res, 500, e.what());
+        return send_error(500, e.what());
     }
 }
 
-void VMRoutes::handle_stop_vm(const httplib::Request& req, httplib::Response& res) {
+crow::response VMRoutes::handle_stop_vm(const crow::request& req, std::string id) {
     try {
-        std::string id = req.path_params.at("id");
         vm_service_.stop_vm(id);
-        res.set_content(json{{"status", "ok"}}.dump(4) + "\n", "application/json");
+        return send_json(json{{"status", "ok"}});
     } catch (const std::exception& e) {
-        send_error(res, 500, e.what());
+        return send_error(500, e.what());
     }
 }
 
-void VMRoutes::handle_get_status(const httplib::Request& req, httplib::Response& res) {
+crow::response VMRoutes::handle_get_status(const crow::request& req, std::string id) {
     try {
-        std::string id = req.path_params.at("id");
         auto status = vm_service_.get_status(id);
         std::string ip = "";
         std::string mac = "";
@@ -120,57 +135,54 @@ void VMRoutes::handle_get_status(const httplib::Request& req, httplib::Response&
             mac = vm_service_.get_vm_mac(id);
         }
 
-        res.set_content(json{
+        return send_json(json{
             {"name", status.name},
             {"state", status.state},
             {"exists", status.exists},
             {"ip", ip},
             {"mac", mac}
-        }.dump(4) + "\n", "application/json");
+        });
     } catch (const std::exception& e) {
-        send_error(res, 500, e.what());
+        return send_error(500, e.what());
     }
 }
 
-void VMRoutes::handle_create_snapshot(const httplib::Request& req, httplib::Response& res) {
+crow::response VMRoutes::handle_create_snapshot(const crow::request& req, std::string id) {
     try {
-        std::string id = req.path_params.at("id");
         std::string snap_name = "";
         if (!req.body.empty()) {
             auto j = json::parse(req.body);
             if (j.contains("name")) snap_name = j["name"];
         }
         std::string created_name = vm_service_.create_snapshot(id, snap_name);
-        res.set_content(json{{"status", "ok"}, {"snapshot", created_name}}.dump(4) + "\n", "application/json");
+        return send_json(json{{"status", "ok"}, {"snapshot", created_name}});
     } catch (const std::exception& e) {
-        send_error(res, 500, e.what());
+        return send_error(500, e.what());
     }
 }
 
-void VMRoutes::handle_restore_snapshot(const httplib::Request& req, httplib::Response& res) {
+crow::response VMRoutes::handle_restore_snapshot(const crow::request& req, std::string id) {
     try {
-        std::string id = req.path_params.at("id");
         std::string snap_name = "";
         if (!req.body.empty()) {
             auto j = json::parse(req.body);
             if (j.contains("name")) snap_name = j["name"];
         }
         vm_service_.restore_snapshot(id, snap_name);
-        res.set_content(json{{"status", "ok"}}.dump(4) + "\n", "application/json");
+        return send_json(json{{"status", "ok"}});
     } catch (const ServiceException& e) {
-        send_error(res, e.error().http_status, e.error().message);
+        return send_error(e.error().http_status, e.error().message);
     } catch (const std::exception& e) {
-        send_error(res, 500, e.what());
+        return send_error(500, e.what());
     }
 }
 
-void VMRoutes::handle_list_snapshots(const httplib::Request& req, httplib::Response& res) {
+crow::response VMRoutes::handle_list_snapshots(const crow::request& req, std::string id) {
     try {
-        std::string id = req.path_params.at("id");
         auto snapshots = vm_service_.list_snapshots(id);
-        res.set_content(json(snapshots).dump(4) + "\n", "application/json");
+        return send_json(json(snapshots));
     } catch (const std::exception& e) {
-        send_error(res, 500, e.what());
+        return send_error(500, e.what());
     }
 }
 
@@ -188,7 +200,18 @@ json VMRoutes::profile_to_json(const VMProfile& profile) {
     };
 }
 
-void VMRoutes::send_error(httplib::Response& res, int status, const std::string& msg) {
-    res.status = status;
-    res.set_content(json{{"error", msg}}.dump(4) + "\n", "application/json");
+crow::response VMRoutes::send_error(int status, const std::string& msg) {
+    crow::response res(json{{"error", msg}}.dump(4) + "\n");
+    res.code = status;
+    res.set_header("Content-Type", "application/json");
+    res.add_header("Access-Control-Allow-Origin", "*");
+    return res;
+}
+
+crow::response VMRoutes::send_json(const json& j, int status) {
+    crow::response res(j.dump(4) + "\n");
+    res.code = status;
+    res.set_header("Content-Type", "application/json");
+    res.add_header("Access-Control-Allow-Origin", "*");
+    return res;
 }

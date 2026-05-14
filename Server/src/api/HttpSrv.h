@@ -1,6 +1,6 @@
 #pragma once
 #include "RouteGroup.h"
-#include <httplib.h>
+#include <crow.h>
 #include <vector>
 #include <memory>
 #include <string>
@@ -18,7 +18,7 @@ private:
     std::string host_;
     int port_;
 
-    httplib::Server server_;
+    crow::SimpleApp app_;
 
     std::vector<std::unique_ptr<RouteGroup>> route_groups_;
     

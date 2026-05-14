@@ -9,7 +9,7 @@ namespace fuzzer {
 class FuzzRoutes : public RouteGroup {
 public:
     FuzzRoutes(FuzzService& service);
-    void register_routes(httplib::Server& svr) override;
+    void register_routes(crow::SimpleApp& app) override;
 
 private:
     FuzzService& service_;

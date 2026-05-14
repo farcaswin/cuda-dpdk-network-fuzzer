@@ -5,14 +5,6 @@
 
 namespace fuzzer {
 
-struct TcpPseudoHeader {
-    uint32_t src_ip;
-    uint32_t dest_ip;
-    uint8_t zero;
-    uint8_t protocol;
-    uint16_t tcp_length;
-};
-
 __global__ void tcp_fuzz_kernel(uint8_t* data, 
                                 uint16_t* lengths, 
                                 uint32_t batch_size,
@@ -47,26 +39,25 @@ __global__ void tcp_fuzz_kernel(uint8_t* data,
 
     // 3. TCP Header
     TcpHeader* tcp = (TcpHeader*)(pkt + sizeof(EthernetHeader) + sizeof(IPv4Header));
-    tcp->src_port = swap_uint16(12345);
+    tcp->src_port = swap_uint16(49152 + (idx % 16383)); // Ephemeral range
     
-    // Mutate dest port (all 65535 ports in one batch if batch_size is 65536)
-    tcp->dest_port = swap_uint16((uint16_t)idx);
+    // Target port (can be exhaustive or fixed via config)
+    // If you want to scan all ports: tcp->dest_port = swap_uint16((uint16_t)idx);
+    tcp->dest_port = swap_uint16(config.dest_port_base);
     
     tcp->seq_num = swap_uint32(idx);
     tcp->ack_num = 0;
     tcp->res1 = 0;
     tcp->data_offset = 5; // 20 bytes
     
-    // Mutate Flags: 65536 / 1024 = 64 combinations of flags. 
-    // We can just use (idx / 1024) for flags, or any other mapping.
-    // Let's use bits 0-5 of idx for flags to ensure all 64 are covered multiple times.
+    // Mutate Flags: 64 combinations (SYN, FIN, RST, PSH, ACK, URG)
     tcp->flags = (uint8_t)(idx & 0x3F); 
     
     tcp->window = swap_uint16(8192);
     tcp->urgent_ptr = 0;
     
-    // TCP Checksum (simplified for demo, usually needs pseudo-header)
-    tcp->checksum = 0;
+    // 4. Compute correct TCP Checksum with pseudo-header
+    compute_tcp_checksum(ip, tcp);
     
     lengths[idx] = sizeof(EthernetHeader) + sizeof(IPv4Header) + sizeof(TcpHeader);
 }

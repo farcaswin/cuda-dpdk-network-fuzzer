@@ -30,8 +30,14 @@ __global__ void ip_header_fuzz_kernel(uint8_t* data,
     ip->total_length = swap_uint16(sizeof(IPv4Header) + 8); // Small payload
     ip->id = swap_uint16((uint16_t)idx);
     
-    // Exhaustive Mutation: 65536 threads cover all combinations of Flags and Fragment Offset
-    ip->fragment_offset = (uint16_t)idx; 
+    // Exhaustive Mutation of Flags (3 bits) and Fragment Offset (13 bits)
+    // Bits 15-13: Flags (Reserved, DF, MF)
+    // Bits 12-0: Fragment Offset (in 8-byte units)
+    uint16_t flags = (uint16_t)((idx >> 13) & 0x0007);
+    uint16_t offset = (uint16_t)(idx & 0x1FFF);
+    uint16_t frag_field = (uint16_t)((flags << 13) | offset);
+    
+    ip->fragment_offset = swap_uint16(frag_field);
     
     ip->ttl = 64;
     ip->protocol = 17; // UDP (dummy payload)

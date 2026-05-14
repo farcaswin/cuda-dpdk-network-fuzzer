@@ -34,4 +34,5 @@ target_link_libraries(fuzzing_lib PRIVATE
     ${DPDK_LIBRARIES}
     utils_lib
     CUDA::cudart
+    nlohmann_json
 )

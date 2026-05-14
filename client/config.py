@@ -22,7 +22,7 @@ POLL_INTERVALS = {
 }
 
 STRATEGY_MAP = {
-    "ICMP Types Exhaustive":  "ICMP_TYPES",
+    "Throughput Test (ICMP)": "ICMP_TYPES",
     "IP Header Exhaustive":   "IP_HEADER",
     "TCP Flags Exhaustive":   "TCP_FLAGS",
 }

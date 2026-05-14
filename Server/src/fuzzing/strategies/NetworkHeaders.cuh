@@ -52,7 +52,7 @@ struct TcpHeader {
 #pragma pack(pop)
 
 /**
- * @brief Calculează checksum-ul RFC 1071 direct pe GPU.
+ * @brief RFC 1071 Checksum computed on the GPU
  */
 __device__ inline uint16_t calculate_checksum(const uint16_t* buf, int len) {
     uint32_t sum = 0;
@@ -72,7 +72,7 @@ __device__ inline uint16_t calculate_checksum(const uint16_t* buf, int len) {
 }
 
 /**
- * @brief Helper pentru checksum IP (doar header).
+ * @brief Helper for IP checksum (just header).
  */
 __device__ inline void compute_ip_checksum(IPv4Header* ip) {
     ip->checksum = 0;
@@ -89,6 +89,47 @@ __device__ inline uint32_t swap_uint32(uint32_t val) {
            ((val & 0x0000FF00) << 8) |
            ((val & 0x000000FF) << 24);
 }
+
+/**
+ * @brief Calculează checksum-ul TCP (include pseudo-header).
+ */
+__device__ inline void compute_tcp_checksum(IPv4Header* ip, TcpHeader* tcp) {
+    tcp->checksum = 0;
+
+    // Pseudo-header (RFC 793)
+    // | Source Address (4) | Dest Address (4) | Zero (1) | Proto (1) | TCP Length (2) |
+    uint32_t sum = 0;
+
+    // Adăugăm adresele IP (ca uint16_t x 4)
+    uint16_t* src_ptr = (uint16_t*)&ip->src_ip;
+    uint16_t* dest_ptr = (uint16_t*)&ip->dest_ip;
+
+    sum += src_ptr[0];
+    sum += src_ptr[1];
+    sum += dest_ptr[0];
+    sum += dest_ptr[1];
+
+    // Protocol (6) și Zero
+    sum += swap_uint16(ip->protocol); 
+
+    // TCP Length (Header + Data). Aici avem doar Header (20 bytes de obicei)
+    uint16_t tcp_len = swap_uint16(sizeof(TcpHeader)); 
+    sum += tcp_len;
+
+    // Adăugăm header-ul TCP
+    uint16_t* tcp_ptr = (uint16_t*)tcp;
+    for (int i = 0; i < sizeof(TcpHeader) / 2; i++) {
+        sum += tcp_ptr[i];
+    }
+
+    // Folding
+    while (sum >> 16) {
+        sum = (sum & 0xFFFF) + (sum >> 16);
+    }
+
+    tcp->checksum = (uint16_t)(~sum);
+}
+
 
 } // namespace fuzzer
 

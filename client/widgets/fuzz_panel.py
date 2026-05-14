@@ -1,12 +1,35 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QGroupBox, QComboBox, QSlider, 
-                             QSpinBox, QCheckBox, QProgressBar)
+                             QSpinBox, QCheckBox, QProgressBar, QMessageBox,
+                             QStyle)
 from PyQt6.QtCore import pyqtSignal, Qt, QPropertyAnimation, QEasingCurve
 from client.config import THEME, STRATEGY_MAP, BURST_SIZE_OPTIONS
 from client.api.client import ApiClient
 from client.api.models import VMProfile, FuzzStats
 from client.workers.api_worker import ApiWorker
 from client.workers.packet_flow_worker import PacketFlowWorker
+import qtawesome as qta
+
+STRATEGY_INFO = {
+    "Throughput Test (ICMP)": {
+        "title": "Throughput Test (ICMP)",
+        "content": "<b>What it does:</b> Exhaustively enumerates all combinations of ICMP Type and Code.<br><br>"
+                   "<b>Efficacy:</b> Low for finding crashes. Modern kernels (Linux ≥ 2.2, Windows ≥ 7) ignore unknown types.<br><br>"
+                   "<b>Purpose:</b> Primarily for benchmarking the raw packet generation (PPS) of the CUDA+DPDK pipeline."
+    },
+    "IP Header Exhaustive": {
+        "title": "IP Header Fragmentation Fuzzing",
+        "content": "<b>What it does:</b> Mutates the <i>Flags</i> and <i>Fragment Offset</i> fields of the IP header.<br><br>"
+                   "<b>Efficacy:</b> High for finding crashes. Tests the fragment reassembly logic (e.g., Teardrop, Overlap vulnerabilities).<br><br>"
+                   "<b>Target:</b> Older Windows systems (XP) and legacy routers/firewalls."
+    },
+    "TCP Flags Exhaustive": {
+        "title": "TCP Flags & State Fuzzing",
+        "content": "<b>What it does:</b> Exhaustively enumerates all permutations of TCP flags (SYN, ACK, RST, FIN, PSH, URG).<br><br>"
+                   "<b>Efficacy:</b> High for finding crashes. Forces the network stack to handle invalid state transitions in the TCB (TCP Control Block).<br><br>"
+                   "<b>Note:</b> Includes correct L4 checksum calculation."
+    }
+}
 
 class FuzzPanel(QWidget):
     fuzz_started = pyqtSignal(dict)
@@ -54,21 +77,37 @@ class FuzzPanel(QWidget):
         self.strategy_combo = QComboBox()
         self.strategy_combo.addItems(STRATEGY_MAP.keys())
         strat_layout.addWidget(self.strategy_combo, 1)
+
+        # Info Button
+        self.info_btn = QPushButton()
+        self.info_btn.setIcon(qta.icon('fa5s.info-circle')) # Using qtawesome icon
+        self.info_btn.setFixedSize(30, 30)
+        self.info_btn.setToolTip("Strategy Information")
+        self.info_btn.setStyleSheet(f"border-radius: 15px; background-color: {THEME['bg_surface']};") # Styling for qtawesome icon
+        self.info_btn.clicked.connect(self._show_strategy_info)
+        strat_layout.addWidget(self.info_btn)
+
         config_layout.addLayout(strat_layout)
 
         # Rate Slider
         rate_layout = QVBoxLayout()
         rate_header = QHBoxLayout()
         rate_header.addWidget(QLabel("Rate (pps):"))
-        self.rate_label = QLabel("10,000")
+
+        self.rate_label = QLabel("500,000")
         self.rate_label.setStyleSheet(f"color: {THEME['accent']}; font-weight: bold;")
         rate_header.addStretch()
         rate_header.addWidget(self.rate_label)
         rate_layout.addLayout(rate_header)
         
+        # Max Speed Toggle
+        self.max_speed_check = QCheckBox("Max Speed (unlimited)")
+        self.max_speed_check.stateChanged.connect(self._on_max_speed_toggled)
+        rate_layout.addWidget(self.max_speed_check)
+
         self.rate_slider = QSlider(Qt.Orientation.Horizontal)
         self.rate_slider.setRange(1, 100) # 10k to 1M
-        self.rate_slider.setValue(10)
+        self.rate_slider.setValue(50)
         self.rate_slider.valueChanged.connect(self._on_rate_changed)
         rate_layout.addWidget(self.rate_slider)
         config_layout.addLayout(rate_layout)
@@ -90,7 +129,7 @@ class FuzzPanel(QWidget):
 
         # Options
         self.auto_snapshot = QCheckBox("Create snapshot before fuzzing")
-        self.auto_snapshot.setChecked(True)
+        self.auto_snapshot.setChecked(False)
         self.auto_restore = QCheckBox("Auto-restore on crash")
         self.auto_restore.setChecked(True)
         config_layout.addWidget(self.auto_snapshot)
@@ -155,6 +194,14 @@ class FuzzPanel(QWidget):
         pps = val * 10000
         self.rate_label.setText(f"{pps:,}")
 
+    def _on_max_speed_toggled(self, state):
+        is_max = (state == 2 or state == Qt.CheckState.Checked)
+        self.rate_slider.setEnabled(not is_max)
+        if is_max:
+            self.rate_label.setText("MAX (Line Rate)")
+        else:
+            self._on_rate_changed(self.rate_slider.value())
+
     def toggle_fuzzing(self):
         if not self._is_fuzzing:
             self.start_fuzzing()
@@ -162,12 +209,13 @@ class FuzzPanel(QWidget):
             self.stop_fuzzing()
 
     def start_fuzzing(self):
+        pps = 0 if self.max_speed_check.isChecked() else self.rate_slider.value() * 10000
         config = {
             "vm_id": self._active_profile.id,
             "target_ip": self._active_profile.target_ip,
             "target_mac": self._active_profile.target_mac,
             "strategy": STRATEGY_MAP[self.strategy_combo.currentText()],
-            "rate_pps": self.rate_slider.value() * 10000,
+            "rate_pps": pps,
             "batch_size": int(self.batch_combo.currentText()),
             "duration_sec": self.duration_spin.value(),
             "auto_snapshot": self.auto_snapshot.isChecked(),
@@ -222,3 +270,15 @@ class FuzzPanel(QWidget):
         self.status_badge.setText("✕ CRASHED")
         self.status_badge.setStyleSheet(f"background-color: {THEME['red']}; color: {THEME['bg_base']}; font-weight: bold;")
         self.crash_detected.emit()
+
+    def _show_strategy_info(self):
+        strat = self.strategy_combo.currentText()
+        info = STRATEGY_INFO.get(strat, {"title": "Info", "content": "Nicio informație disponibilă."})
+        
+        msg = QMessageBox(self)
+        msg.setWindowTitle(info["title"])
+        msg.setText(info["content"])
+        msg.setIcon(QMessageBox.Icon.Information)
+        # Use simple palette adjustment for dark mode readability
+        msg.setStyleSheet(f"QLabel {{ color: {THEME['text']}; min-width: 300px; }} QPushButton {{ background-color: {THEME['bg_surface']}; }}")
+        msg.exec()

@@ -5,6 +5,7 @@
 #include "DpdkSender.h"
 #include "VMService.h"
 #include "TargetMonitor.h"
+#include "NotificationHub.h"
 #include <nlohmann/json.hpp>
 #include <string>
 #include <memory>
@@ -19,13 +20,16 @@ struct FuzzParams {
     std::string src_ip;
     std::string src_mac;
     std::string strategy;
+    uint16_t target_port = 0;
     uint32_t batch_size = 65536;
+    uint32_t rate_pps = 0; // 0 means max speed
+    uint32_t duration_sec = 0; // 0 means infinite
     bool auto_restore = false;
 };
 
 class FuzzService {
 public:
-    FuzzService(DpdkSender& dpdk_sender, VMService& vm_service);
+    FuzzService(DpdkSender& dpdk_sender, VMService& vm_service, NotificationHub& hub);
     ~FuzzService() = default;
 
     void start_fuzzing(const FuzzParams& params);
@@ -40,6 +44,7 @@ private:
 
     DpdkSender& dpdk_sender_;
     VMService& vm_service_;
+    NotificationHub& hub_;
     FuzzEngine engine_;
     TargetMonitor monitor_;
 };

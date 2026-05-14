@@ -16,6 +16,26 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(spdlog)
 
+# Asio (Standalone)
+FetchContent_Declare(
+  asio
+  GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
+  GIT_TAG asio-1-30-2
+)
+FetchContent_MakeAvailable(asio)
+
+# Crow
+set(CROW_ENABLE_SSL OFF CACHE INTERNAL "")
+set(CROW_ENABLE_COMPRESSION OFF CACHE INTERNAL "")
+FetchContent_Declare(
+    Crow
+    GIT_REPOSITORY https://github.com/CrowCpp/Crow.git
+    GIT_TAG v1.2.0
+)
+# Crucial: Link Crow to the Asio we just fetched
+set(ASIO_INCLUDE_DIR ${asio_SOURCE_DIR}/asio/include CACHE INTERNAL "")
+FetchContent_MakeAvailable(Crow)
+
 add_library(httplib INTERFACE)
 target_include_directories(httplib INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/external/httplib

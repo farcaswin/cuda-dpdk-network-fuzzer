@@ -31,8 +31,8 @@ private:
     
     std::thread thread_;
     std::atomic<bool> running_{false};
-    int interval_ms_ = 500;
-    int max_failures_ = 3;
+    int interval_ms_ = 1000;
+    int max_failures_ = 5;
 };
 
 } // namespace fuzzer

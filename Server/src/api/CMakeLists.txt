@@ -6,12 +6,14 @@ add_library(api_lib STATIC
     routing/VMRoutes.cpp
     routing/FuzzRoutes.h
     routing/FuzzRoutes.cpp
+    routing/TelemetryRoutes.h
+    routing/TelemetryRoutes.cpp
 )
 
 target_include_directories(api_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(api_lib PUBLIC 
-    httplib
+    Crow::Crow
     nlohmann_json
     service_lib
     utils_lib

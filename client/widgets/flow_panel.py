@@ -73,20 +73,6 @@ class FlowPanel(QWidget):
         
         layout.addWidget(log_group)
 
-        # COMPONENT 4: GPU Pipeline Visual
-        gpu_group = QGroupBox("GPU Pipeline")
-        gpu_layout = QVBoxLayout(gpu_group)
-        
-        self.buf_a_label = QLabel("Buffer A: [░░░░░░░░░░] Idle")
-        self.buf_b_label = QLabel("Buffer B: [░░░░░░░░░░] Idle")
-        self.gpu_mem_label = QLabel("GPU Memory: 0 MB / 4096 MB")
-        
-        gpu_layout.addWidget(self.buf_a_label)
-        gpu_layout.addWidget(self.buf_b_label)
-        gpu_layout.addWidget(self.gpu_mem_label)
-        
-        layout.addWidget(gpu_group)
-
     def _create_stat_label(self, name, color):
         lbl = QLabel("0")
         lbl.setStyleSheet(f"color: {color}; font-size: 18pt; font-weight: bold;")
@@ -111,11 +97,6 @@ class FlowPanel(QWidget):
             self.graph_widget.setYRange(0, current_max * 1.2)
         else:
             self.graph_widget.setYRange(0, 1000000)
-
-        # Approximate GPU visual
-        fill_a = "█" * 10 if stats.packets_sent > 0 else "░" * 10
-        self.buf_a_label.setText(f"Buffer A: [{fill_a}] Generating")
-        self.buf_b_label.setText(f"Buffer B: [{fill_a}] Sending")
 
     def add_log_entry(self, level, msg):
         timestamp = datetime.now().strftime("%H:%M:%S")
