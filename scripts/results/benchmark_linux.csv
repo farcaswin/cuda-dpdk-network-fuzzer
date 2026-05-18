@@ -1,0 +1,5 @@
+pipeline,batch_size,total_sent,pps
+CPU Single-Threaded + Linux Sockets,1024,102400,390306.25
+CPU Single-Threaded + Linux Sockets,4096,409600,1349583.08
+CPU Single-Threaded + Linux Sockets,16384,1638400,1167581.15
+CPU Single-Threaded + Linux Sockets,65536,6553600,1126974.98

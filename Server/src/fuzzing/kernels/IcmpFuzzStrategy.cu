@@ -32,8 +32,8 @@ __global__ void icmp_fuzz_kernel(uint8_t* data,
     ip->fragment_offset = 0;
     ip->ttl = 64;
     ip->protocol = 1; // ICMP
-    ip->src_ip = config.src_ip;
-    ip->dest_ip = config.dest_ip;
+    set_uint32(&ip->src_ip, config.src_ip);
+    set_uint32(&ip->dest_ip, config.dest_ip);
 
     // 3. ICMP Header
     IcmpHeader* icmp = (IcmpHeader*)(pkt + sizeof(EthernetHeader) + sizeof(IPv4Header));

@@ -58,7 +58,8 @@ class TelemetryWorker(BaseWorker):
                     packets_generated=data.get("packets_sent", 0),
                     packets_sent=data.get("packets_sent", 0),
                     actual_pps=int(data.get("pps", 0)),
-                    target_alive=data.get("target_alive", True)
+                    target_alive=data.get("target_alive", True),
+                    is_running=data.get("running", True)
                 )
                 self.stats_update.emit(stats)
             

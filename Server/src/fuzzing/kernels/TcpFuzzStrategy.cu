@@ -32,20 +32,19 @@ __global__ void tcp_fuzz_kernel(uint8_t* data,
     ip->fragment_offset = 0;
     ip->ttl = 64;
     ip->protocol = 6; // TCP
-    ip->src_ip = config.src_ip;
-    ip->dest_ip = config.dest_ip;
+    set_uint32(&ip->src_ip, config.src_ip);
+    set_uint32(&ip->dest_ip, config.dest_ip);
 
     compute_ip_checksum(ip);
 
     // 3. TCP Header
     TcpHeader* tcp = (TcpHeader*)(pkt + sizeof(EthernetHeader) + sizeof(IPv4Header));
-    tcp->src_port = swap_uint16(49152 + (idx % 16383)); // Ephemeral range
+    set_uint16(&tcp->src_port, swap_uint16(49152 + (idx % 16383))); // Ephemeral range
     
     // Target port (can be exhaustive or fixed via config)
-    // If you want to scan all ports: tcp->dest_port = swap_uint16((uint16_t)idx);
-    tcp->dest_port = swap_uint16(config.dest_port_base);
+    set_uint16(&tcp->dest_port, swap_uint16(config.dest_port_base));
     
-    tcp->seq_num = swap_uint32(idx);
+    set_uint32(&tcp->seq_num, swap_uint32(idx));
     tcp->ack_num = 0;
     tcp->res1 = 0;
     tcp->data_offset = 5; // 20 bytes
@@ -53,7 +52,7 @@ __global__ void tcp_fuzz_kernel(uint8_t* data,
     // Mutate Flags: 64 combinations (SYN, FIN, RST, PSH, ACK, URG)
     tcp->flags = (uint8_t)(idx & 0x3F); 
     
-    tcp->window = swap_uint16(8192);
+    set_uint16(&tcp->window, swap_uint16(8192));
     tcp->urgent_ptr = 0;
     
     // 4. Compute correct TCP Checksum with pseudo-header

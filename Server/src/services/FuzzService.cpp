@@ -2,6 +2,7 @@
 #include "IcmpFuzzStrategy.h"
 #include "IpHeaderFuzzStrategy.h"
 #include "TcpFuzzStrategy.h"
+#include "HeavyPayloadFuzzStrategy.h"
 #include "Logger.h"
 #include <arpa/inet.h>
 #include <cstdio>
@@ -56,6 +57,13 @@ void FuzzService::start_fuzzing(const FuzzParams& params) {
         cfg.src_ip = src_ip;
         cfg.dest_port_base = params.target_port;
         strategy = std::make_unique<TcpFuzzStrategy>(cfg);
+    } else if (params.strategy == "HEAVY_PAYLOAD") {
+        HeavyPayloadFuzzStrategy::Config cfg;
+        memcpy(cfg.dest_mac, dest_mac, 6);
+        memcpy(cfg.src_mac, src_mac, 6);
+        cfg.dest_ip = dest_ip;
+        cfg.src_ip = src_ip;
+        strategy = std::make_unique<HeavyPayloadFuzzStrategy>(cfg);
     } else {
         throw std::runtime_error("Unknown strategy: " + params.strategy);
     }

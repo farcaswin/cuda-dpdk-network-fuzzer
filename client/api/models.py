@@ -21,6 +21,7 @@ class FuzzStats:
     actual_pps: int = 0
     crashes_detected: int = 0
     target_alive: bool = True
+    is_running: bool = True
     elapsed_sec: int = 0
     strategy: str = ""
     batch_size: int = 0

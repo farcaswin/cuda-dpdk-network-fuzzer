@@ -77,7 +77,7 @@ private:
 
     static constexpr uint32_t MAX_PACKET_SIZE = 1514;
     static constexpr uint16_t DPDK_BURST_SIZE = 64;
-    static constexpr uint32_t NUM_MBUFS = 153599; // Total mbufs
+    static constexpr uint32_t NUM_MBUFS = 70000; // Reduced from 153k to save memory on laptops
     static constexpr uint32_t MBUF_CACHE_SIZE = 250;
     static constexpr uint16_t RX_RING_SIZE = 1024;
     static constexpr uint16_t TX_RING_SIZE = 1024;

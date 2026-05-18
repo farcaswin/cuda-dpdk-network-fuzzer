@@ -25,6 +25,7 @@ STRATEGY_MAP = {
     "Throughput Test (ICMP)": "ICMP_TYPES",
     "IP Header Exhaustive":   "IP_HEADER",
     "TCP Flags Exhaustive":   "TCP_FLAGS",
+    "Compute Heavy (UDP+CRC32)": "HEAVY_PAYLOAD",
 }
 
 BURST_SIZE_OPTIONS = [4096, 16384, 65536, 131072, 262144]

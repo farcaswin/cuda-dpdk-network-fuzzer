@@ -28,6 +28,13 @@ STRATEGY_INFO = {
         "content": "<b>What it does:</b> Exhaustively enumerates all permutations of TCP flags (SYN, ACK, RST, FIN, PSH, URG).<br><br>"
                    "<b>Efficacy:</b> High for finding crashes. Forces the network stack to handle invalid state transitions in the TCB (TCP Control Block).<br><br>"
                    "<b>Note:</b> Includes correct L4 checksum calculation."
+    },
+    "Compute Heavy (UDP+CRC32)": {
+        "title": "Stateful Payload Fuzzing (Layer 7)",
+        "content": "<b>What it does:</b> Generates a 1024-byte pseudo-random payload (PRNG) and calculates a valid CRC32 checksum per packet.<br><br>"
+                   "<b>Efficacy:</b> Very High for deep inspection targets. Bypasses checksum filters and tests application-level parsers.<br><br>"
+                   "<b>OSI Layer:</b> Layer 7 (Application) over Layer 4 (UDP).<br><br>"
+                   "<b>Thesis Note:</b> Demonstrates the massive parallel advantage of GPU (up to 400x) over CPU in compute-bound workloads."
     }
 }
 
@@ -260,6 +267,10 @@ class FuzzPanel(QWidget):
             val = int((stats.elapsed_sec / self.duration_spin.value()) * 100)
             self.progress.setValue(min(val, 100))
         
+        # Reset UI if server says fuzzing stopped
+        if not stats.is_running and self._is_fuzzing:
+            self._on_fuzz_stopped()
+
         if not stats.target_alive:
             self.on_crash()
         else:

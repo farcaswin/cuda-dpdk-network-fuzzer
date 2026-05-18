@@ -9,6 +9,7 @@ add_library(fuzzing_lib STATIC
     kernels/IcmpFuzzStrategy.cu
     kernels/IpHeaderFuzzStrategy.cu
     kernels/TcpFuzzStrategy.cu
+    kernels/HeavyPayloadFuzzStrategy.cu
 )
 
 # ISA Optimization for high-performance DPDK operations (rte_memcpy)

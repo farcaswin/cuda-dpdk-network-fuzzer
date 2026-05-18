@@ -53,7 +53,10 @@ add_subdirectory(src/api)
 add_subdirectory(src/utils)
 add_subdirectory(src/fuzzing)
 
+add_subdirectory(src/benchmark)
+
 add_executable(fuzzer-srv main.cpp)
+add_executable(fuzzer-bench main_benchmark.cpp)
 
 target_link_libraries(fuzzer-srv PRIVATE 
     utils_lib
@@ -64,4 +67,9 @@ target_link_libraries(fuzzer-srv PRIVATE
     fuzzing_lib
     spdlog::spdlog_header_only
     CUDA::cudart
+)
+
+target_link_libraries(fuzzer-bench PRIVATE
+    fuzzer_benchmark
+    spdlog::spdlog_header_only
 )

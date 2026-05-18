@@ -2,11 +2,19 @@
 #include "Logger.h"
 #include <chrono>
 
+#define CUDA_CHECK(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
+   if (code != cudaSuccess) {
+      LOG_ERROR("GPUassert: {} {} {}", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
 namespace fuzzer {
 
 FuzzEngine::FuzzEngine(DpdkSender& dpdk_sender, NotificationHub& hub) 
     : dpdk_sender_(dpdk_sender), hub_(hub) {
-    cudaStreamCreate(&stream_);
+    CUDA_CHECK(cudaStreamCreate(&stream_));
 }
 
 FuzzEngine::~FuzzEngine() {
@@ -21,8 +29,13 @@ void FuzzEngine::start(std::unique_ptr<IFuzzStrategy> strategy, uint32_t batch_s
     batch_size_ = batch_size;
     rate_pps_ = rate_pps;
     duration_sec_ = duration_sec;
-    buffer_ = std::make_unique<PacketBuffer>(batch_size_);
-    
+
+    // Use pool: only allocate if we don't have a buffer or it's too small
+    if (!buffer_ || buffer_->get_capacity() < batch_size_) {
+        buffer_ = std::make_unique<PacketBuffer>(std::max(batch_size_, 65536u));
+    }
+    buffer_->set_batch_size(batch_size_);
+
     // Reset stats for new session
     stats_.packets_sent = 0;
     stats_.current_pps = 0.0;
@@ -35,16 +48,17 @@ void FuzzEngine::start(std::unique_ptr<IFuzzStrategy> strategy, uint32_t batch_s
 }
 
 void fuzzer::FuzzEngine::stop() {
-    if (!running_) return;
+    bool expected = true;
+    if (running_.compare_exchange_strong(expected, false)) {
+        LOG_INFO("Stopping FuzzEngine...");
+    }
 
-    running_ = false;
     if (worker_thread_.joinable()) {
         worker_thread_.join();
     }
     
     strategy_.reset();
-    buffer_.reset();
-    LOG_INFO("FuzzEngine stopped.");
+    // buffer_.reset(); // KEEP BUFFER FOR POOL REUSE
 }
 
 void FuzzEngine::loop() {
@@ -63,16 +77,16 @@ void FuzzEngine::loop() {
     while (running_) {
         auto iter_start = std::chrono::steady_clock::now();
 
-        // 1. Launch CUDA kernel on the GPU (asynchronous)
-        // It writes to the current 'write' buffer in PacketBuffer
+        // 1. Launch CUDA kernel on the GPU (Direct Write to Pinned Host Memory)
         strategy_->launch_kernel(
-            buffer_->get_gpu_data(),
-            buffer_->get_gpu_lengths(),
+            buffer_->get_device_data(),
+            buffer_->get_device_lengths(),
             batch_size_,
             stream_
         );
+        CUDA_CHECK(cudaGetLastError());
 
-        // 2. While GPU is busy, CPU sends the previous batch through DPDK
+        // 2. While GPU is busy generating the CURRENT batch, CPU sends the PREVIOUS batch through DPDK
         if (has_previous_data) {
             uint32_t sent = dpdk_sender_.send_burst(
                 buffer_->get_dpdk_data(),
@@ -84,7 +98,7 @@ void FuzzEngine::loop() {
         }
 
         // 3. Synchronize with GPU - wait for the current batch generation to finish
-        cudaStreamSynchronize(stream_);
+        CUDA_CHECK(cudaStreamSynchronize(stream_));
 
         // 4. Swap buffers for the next iteration
         buffer_->swap();
@@ -99,35 +113,45 @@ void FuzzEngine::loop() {
             }
         }
 
-        // 6. Update PPS stats every 1 second
+        // 6. Update PPS stats every 1 second or on session end
         auto now = std::chrono::steady_clock::now();
-
+        auto elapsed_stats = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_stats_time).count();
+        
         // Check session duration
+        bool session_ended = false;
         if (duration_sec_ > 0) {
             auto elapsed_total = std::chrono::duration_cast<std::chrono::seconds>(now - start_time).count();
             if (elapsed_total >= duration_sec_) {
                 LOG_INFO("Session duration reached ({}s). Stopping fuzzing...", duration_sec_);
-                running_ = false;
-                break;
+                session_ended = true;
             }
         }
 
-        auto elapsed_stats = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_stats_time).count();
-        if (elapsed_stats >= 1000) {
-            double pps = (total_sent_in_period * 1000.0) / elapsed_stats;
+        if (elapsed_stats >= 1000 || session_ended) {
+            double pps = (total_sent_in_period * 1000.0) / std::max(1L, elapsed_stats);
             stats_.current_pps = pps;
             
             LOG_DEBUG("Fuzzing: {:.2f} pps, Total: {}", pps, stats_.packets_sent.load());
             
             // Push stats to NotificationHub
             hub_.send_stats({
-                {"pps", pps},
+                {"pps", session_ended ? 0.0 : pps},
                 {"packets_sent", stats_.packets_sent.load()},
-                {"target_alive", stats_.target_alive.load()}
+                {"target_alive", stats_.target_alive.load()},
+                {"running", !session_ended}
             });
+
+            if (session_ended) {
+                hub_.send_log("INFO", "Fuzzing session ended (duration reached)");
+            }
             
             total_sent_in_period = 0;
             last_stats_time = now;
+        }
+
+        if (session_ended) {
+            running_ = false;
+            break;
         }
     }
 }

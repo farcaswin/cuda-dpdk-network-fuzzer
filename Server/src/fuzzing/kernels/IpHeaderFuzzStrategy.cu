@@ -41,14 +41,13 @@ __global__ void ip_header_fuzz_kernel(uint8_t* data,
     
     ip->ttl = 64;
     ip->protocol = 17; // UDP (dummy payload)
-    ip->src_ip = config.src_ip;
-    ip->dest_ip = config.dest_ip;
+    set_uint32(&ip->src_ip, config.src_ip);
+    set_uint32(&ip->dest_ip, config.dest_ip);
 
     compute_ip_checksum(ip);
 
     // 3. Dummy Payload (8 bytes)
-    uint64_t* payload = (uint64_t*)(pkt + sizeof(EthernetHeader) + sizeof(IPv4Header));
-    *payload = 0xDEADBEEFCAFEBABE;
+    set_uint64(pkt + sizeof(EthernetHeader) + sizeof(IPv4Header), 0xDEADBEEFCAFEBABE);
 
     lengths[idx] = sizeof(EthernetHeader) + sizeof(IPv4Header) + 8;
 }

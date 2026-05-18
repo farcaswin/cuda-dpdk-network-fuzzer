@@ -52,16 +52,22 @@ struct TcpHeader {
 #pragma pack(pop)
 
 /**
- * @brief RFC 1071 Checksum computed on the GPU
+ * @brief RFC 1071 Checksum computed on the GPU.
+ * Safe for unaligned buffers.
  */
-__device__ inline uint16_t calculate_checksum(const uint16_t* buf, int len) {
+__device__ inline uint16_t calculate_checksum(const void* buf, int len) {
     uint32_t sum = 0;
+    const uint8_t* p = (const uint8_t*)buf;
+    
     while (len > 1) {
-        sum += *buf++;
+        uint16_t val;
+        val = p[0] | (p[1] << 8);
+        sum += val;
+        p += 2;
         len -= 2;
     }
     if (len == 1) {
-        sum += *(const uint8_t*)buf;
+        sum += *p;
     }
     
     while (sum >> 16) {
@@ -72,11 +78,41 @@ __device__ inline uint16_t calculate_checksum(const uint16_t* buf, int len) {
 }
 
 /**
+ * @brief Safe unaligned write for 16-bit values.
+ */
+__device__ inline void set_uint16(void* ptr, uint16_t val) {
+    uint8_t* p = (uint8_t*)ptr;
+    p[0] = (uint8_t)(val & 0xFF);
+    p[1] = (uint8_t)(val >> 8);
+}
+
+/**
+ * @brief Safe unaligned write for 32-bit values.
+ */
+__device__ inline void set_uint32(void* ptr, uint32_t val) {
+    uint8_t* p = (uint8_t*)ptr;
+    p[0] = (uint8_t)(val & 0xFF);
+    p[1] = (uint8_t)((val >> 8) & 0xFF);
+    p[2] = (uint8_t)((val >> 16) & 0xFF);
+    p[3] = (uint8_t)((val >> 24) & 0xFF);
+}
+
+/**
+ * @brief Safe unaligned write for 64-bit values.
+ */
+__device__ inline void set_uint64(void* ptr, uint64_t val) {
+    uint8_t* p = (uint8_t*)ptr;
+    for (int i = 0; i < 8; ++i) {
+        p[i] = (uint8_t)((val >> (i * 8)) & 0xFF);
+    }
+}
+
+/**
  * @brief Helper for IP checksum (just header).
  */
 __device__ inline void compute_ip_checksum(IPv4Header* ip) {
     ip->checksum = 0;
-    ip->checksum = calculate_checksum((uint16_t*)ip, sizeof(IPv4Header));
+    ip->checksum = calculate_checksum(ip, sizeof(IPv4Header));
 }
 
 __device__ inline uint16_t swap_uint16(uint16_t val) {
@@ -92,34 +128,33 @@ __device__ inline uint32_t swap_uint32(uint32_t val) {
 
 /**
  * @brief Calculează checksum-ul TCP (include pseudo-header).
+ * Adaptat pentru accese safe (nealiniate).
  */
 __device__ inline void compute_tcp_checksum(IPv4Header* ip, TcpHeader* tcp) {
     tcp->checksum = 0;
-
-    // Pseudo-header (RFC 793)
-    // | Source Address (4) | Dest Address (4) | Zero (1) | Proto (1) | TCP Length (2) |
     uint32_t sum = 0;
 
-    // Adăugăm adresele IP (ca uint16_t x 4)
-    uint16_t* src_ptr = (uint16_t*)&ip->src_ip;
-    uint16_t* dest_ptr = (uint16_t*)&ip->dest_ip;
+    // Pseudo-header (RFC 793)
+    // Source & Dest IP
+    const uint8_t* src_ptr = (const uint8_t*)&ip->src_ip;
+    const uint8_t* dest_ptr = (const uint8_t*)&ip->dest_ip;
 
-    sum += src_ptr[0];
-    sum += src_ptr[1];
-    sum += dest_ptr[0];
-    sum += dest_ptr[1];
+    sum += src_ptr[0] | (src_ptr[1] << 8);
+    sum += src_ptr[2] | (src_ptr[3] << 8);
+    sum += dest_ptr[0] | (dest_ptr[1] << 8);
+    sum += dest_ptr[2] | (dest_ptr[3] << 8);
 
     // Protocol (6) și Zero
-    sum += swap_uint16(ip->protocol); 
+    sum += swap_uint16((uint16_t)ip->protocol); 
 
-    // TCP Length (Header + Data). Aici avem doar Header (20 bytes de obicei)
-    uint16_t tcp_len = swap_uint16(sizeof(TcpHeader)); 
-    sum += tcp_len;
+    // TCP Length
+    uint16_t tcp_len = sizeof(TcpHeader); 
+    sum += swap_uint16(tcp_len);
 
-    // Adăugăm header-ul TCP
-    uint16_t* tcp_ptr = (uint16_t*)tcp;
-    for (int i = 0; i < sizeof(TcpHeader) / 2; i++) {
-        sum += tcp_ptr[i];
+    // Header-ul TCP
+    const uint8_t* tcp_raw = (const uint8_t*)tcp;
+    for (int i = 0; i < sizeof(TcpHeader); i += 2) {
+        sum += tcp_raw[i] | (tcp_raw[i+1] << 8);
     }
 
     // Folding

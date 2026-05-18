@@ -43,7 +43,8 @@ int main(int argc, char** argv) {
             argv[0],
             "--vdev=net_tap0,iface=dpdk0",
             "--lcores=0",
-            "--log-level=lib.eal:6", // Reduce spam from EAL
+            "--no-pci",             // Crucial for laptops to ignore physical NICs
+            "--log-level=lib.eal:6", 
             "--"
         };
         int auto_argc = sizeof(auto_argv) / sizeof(auto_argv[0]);
