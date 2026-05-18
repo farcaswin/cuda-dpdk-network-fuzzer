@@ -46,7 +46,7 @@ __global__ void icmp_fuzz_kernel(uint8_t* data,
     
     // Checksums
     icmp->checksum = 0;
-    icmp->checksum = calculate_checksum((uint16_t*)icmp, sizeof(IcmpHeader));
+    icmp->checksum = swap_uint16(calculate_checksum((uint16_t*)icmp, sizeof(IcmpHeader))); // FIX: store in NBO
     
     compute_ip_checksum(ip);
 

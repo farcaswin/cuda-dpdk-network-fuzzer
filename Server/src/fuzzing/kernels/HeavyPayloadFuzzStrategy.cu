@@ -52,14 +52,26 @@ __global__ void heavy_payload_kernel(uint8_t* data,
     IPv4Header* ip = (IPv4Header*)(pkt + 14);
     ip->version = 4;
     ip->ihl = 5;
+    ip->tos = 0;
+    ip->id = swap_uint16((uint16_t)idx);
+    ip->fragment_offset = 0;
     ip->protocol = 17; // UDP
     set_uint32(&ip->src_ip, config.src_ip);
     set_uint32(&ip->dest_ip, config.dest_ip);
     ip->ttl = 64;
-    ip->total_length = swap_uint16(20 + 8 + 1024); // IP + UDP + Payload
+    ip->total_length = swap_uint16(sizeof(IPv4Header) + sizeof(UdpHeader) + 1024); // IP + UDP + Payload
+    
+    compute_ip_checksum(ip);
+
+    // 1.1 UDP Header
+    UdpHeader* udp = (UdpHeader*)(pkt + 14 + sizeof(IPv4Header));
+    set_uint16(&udp->src_port, swap_uint16(49152 + (idx % 16383)));
+    set_uint16(&udp->dest_port, swap_uint16(445)); // Default target
+    udp->length = swap_uint16(sizeof(UdpHeader) + 1024);
+    udp->checksum = 0; // Optional in UDP, but good for fuzzing
 
     // 2. Heavy Computation: Payload Generation (1024 bytes)
-    uint8_t* payload = pkt + 14 + 20 + 8;
+    uint8_t* payload = pkt + 14 + sizeof(IPv4Header) + sizeof(UdpHeader);
     uint32_t prng_state = idx + 1; // Unique seed per thread
     
     // Fill 1024 bytes using PRNG
@@ -72,7 +84,8 @@ __global__ void heavy_payload_kernel(uint8_t* data,
     }
 
     // 3. Heavy Computation: CRC32 of the payload
-    uint32_t crc = compute_crc32(payload, 1024);
+    // FIX: compute CRC over first 1020 bytes, then append — do not overwrite computed region
+    uint32_t crc = compute_crc32(payload, 1020);
     
     // Put CRC at the end of payload (safe unaligned write)
     payload[1020] = (uint8_t)(crc & 0xFF);
@@ -80,7 +93,7 @@ __global__ void heavy_payload_kernel(uint8_t* data,
     payload[1022] = (uint8_t)((crc >> 16) & 0xFF);
     payload[1023] = (uint8_t)((crc >> 24) & 0xFF);
 
-    lengths[idx] = 14 + 20 + 8 + 1024;
+    lengths[idx] = 14 + sizeof(IPv4Header) + sizeof(UdpHeader) + 1024;
 }
 
 HeavyPayloadFuzzStrategy::HeavyPayloadFuzzStrategy(const Config& config) : config_(config) {}

@@ -227,6 +227,7 @@ uint32_t DpdkSender::send_burst(const uint8_t* packet_data, const uint16_t* pack
         }
 
         // 2. Prepare each mbuf in the burst
+        uint16_t valid_count = 0;
         for (uint16_t j = 0; j < current_burst_size; ++j) {
             uint32_t global_idx = i + j;
             uint16_t len = packet_lengths[global_idx];
@@ -234,8 +235,8 @@ uint32_t DpdkSender::send_burst(const uint8_t* packet_data, const uint16_t* pack
             // Safety check for length
             if (len == 0 || len > MAX_PACKET_SIZE) {
                 // LOG_WARN("Invalid packet length ({}). Skipping packet {}.", len, global_idx);
-                rte_pktmbuf_free(mbufs[j]); // Free the mbuf since it won't be sent
-                continue; // Skip this mbuf in the current burst
+                rte_pktmbuf_free(mbufs[j]); // FIX: free before dropping from array
+                continue; 
             }
 
             // Calculate offset in the giant pinned memory buffer
@@ -245,23 +246,20 @@ uint32_t DpdkSender::send_burst(const uint8_t* packet_data, const uint16_t* pack
             char* dst = rte_pktmbuf_append(mbufs[j], len);
             if (dst) {
                 rte_memcpy(dst, src, len);
+                mbufs[valid_count++] = mbufs[j]; // FIX: compact array, only include valid mbufs
             } else {
                 LOG_ERROR("Failed to append {} bytes to mbuf", len);
-                rte_pktmbuf_free(mbufs[j]); // Free the mbuf on append failure
-                continue; // Skip this mbuf
+                rte_pktmbuf_free(mbufs[j]);
             }
         }
 
         // 3. Transmit the burst
-        uint16_t sent = rte_eth_tx_burst(port_id_, 0, mbufs, current_burst_size);
-        // if (sent > 0) {
-        //     LOG_DEBUG("DPDK: Sent {} packets in burst.", sent);
-        // }
+        uint16_t sent = rte_eth_tx_burst(port_id_, 0, mbufs, valid_count); // FIX: use valid_count not current_burst_size
         total_sent += sent;
 
         // 4. Free mbufs that were not sent (TX ring full)
-        if (sent < current_burst_size) {
-            for (uint16_t k = sent; k < current_burst_size; ++k) {
+        if (sent < valid_count) {
+            for (uint16_t k = sent; k < valid_count; ++k) {
                 rte_pktmbuf_free(mbufs[k]);
             }
         }

@@ -49,6 +49,5 @@
 **/*.fatbin
 
 GEMINI.md
-Documentatie.md
 /logs
 /scripts/*.csv

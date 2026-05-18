@@ -48,7 +48,7 @@ BenchmarkRun GeneratorBenchmark::run_single(IPacketGenerator& gen, uint32_t batc
     if (!gen.is_gpu()) {
         result.packets_verified = verify_checksums(output_buffer_.data(), lengths_buffer_.data(), batch_size, 100);
     } else {
-        result.packets_verified = batch_size; // Assume GPU is correct for throughput test
+        result.packets_verified = verify_checksums(output_buffer_.data(), lengths_buffer_.data(), batch_size, 100); // FIX: verify GPU checksums
     }
 
     LOG_INFO("[Benchmark] {} | batch={} | {:.3f} Mpps | {:.2f} Gbps",

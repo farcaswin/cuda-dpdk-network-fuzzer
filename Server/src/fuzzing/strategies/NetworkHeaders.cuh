@@ -49,7 +49,29 @@ struct TcpHeader {
     uint16_t urgent_ptr;
 };
 
+struct UdpHeader {
+    uint16_t src_port;
+    uint16_t dest_port;
+    uint16_t length;
+    uint16_t checksum;
+};
+
 #pragma pack(pop)
+
+/**
+ * @brief RFC 1071 Checksum computed on the GPU.
+ * Safe for unaligned buffers.
+ */
+__device__ inline uint16_t swap_uint16(uint16_t val) {
+    return (val << 8) | (val >> 8);
+}
+
+__device__ inline uint32_t swap_uint32(uint32_t val) {
+    return ((val & 0xFF000000) >> 24) |
+           ((val & 0x00FF0000) >> 8) |
+           ((val & 0x0000FF00) << 8) |
+           ((val & 0x000000FF) << 24);
+}
 
 /**
  * @brief RFC 1071 Checksum computed on the GPU.
@@ -61,13 +83,13 @@ __device__ inline uint16_t calculate_checksum(const void* buf, int len) {
     
     while (len > 1) {
         uint16_t val;
-        val = p[0] | (p[1] << 8);
+        val = (uint16_t)((p[0] << 8) | p[1]); // FIX: BE accumulation
         sum += val;
         p += 2;
         len -= 2;
     }
     if (len == 1) {
-        sum += *p;
+        sum += (uint16_t)(*p << 8); // FIX: BE accumulation (padding)
     }
     
     while (sum >> 16) {
@@ -82,7 +104,7 @@ __device__ inline uint16_t calculate_checksum(const void* buf, int len) {
  */
 __device__ inline void set_uint16(void* ptr, uint16_t val) {
     uint8_t* p = (uint8_t*)ptr;
-    p[0] = (uint8_t)(val & 0xFF);
+    p[0] = (uint8_t)(val & 0xFF); // FIX: simple copy (Host Order)
     p[1] = (uint8_t)(val >> 8);
 }
 
@@ -91,7 +113,7 @@ __device__ inline void set_uint16(void* ptr, uint16_t val) {
  */
 __device__ inline void set_uint32(void* ptr, uint32_t val) {
     uint8_t* p = (uint8_t*)ptr;
-    p[0] = (uint8_t)(val & 0xFF);
+    p[0] = (uint8_t)(val & 0xFF); // FIX: simple copy (Host Order)
     p[1] = (uint8_t)((val >> 8) & 0xFF);
     p[2] = (uint8_t)((val >> 16) & 0xFF);
     p[3] = (uint8_t)((val >> 24) & 0xFF);
@@ -103,7 +125,7 @@ __device__ inline void set_uint32(void* ptr, uint32_t val) {
 __device__ inline void set_uint64(void* ptr, uint64_t val) {
     uint8_t* p = (uint8_t*)ptr;
     for (int i = 0; i < 8; ++i) {
-        p[i] = (uint8_t)((val >> (i * 8)) & 0xFF);
+        p[i] = (uint8_t)((val >> (i * 8)) & 0xFF); // FIX: simple copy (Host Order)
     }
 }
 
@@ -112,18 +134,7 @@ __device__ inline void set_uint64(void* ptr, uint64_t val) {
  */
 __device__ inline void compute_ip_checksum(IPv4Header* ip) {
     ip->checksum = 0;
-    ip->checksum = calculate_checksum(ip, sizeof(IPv4Header));
-}
-
-__device__ inline uint16_t swap_uint16(uint16_t val) {
-    return (val << 8) | (val >> 8);
-}
-
-__device__ inline uint32_t swap_uint32(uint32_t val) {
-    return ((val & 0xFF000000) >> 24) |
-           ((val & 0x00FF0000) >> 8) |
-           ((val & 0x0000FF00) << 8) |
-           ((val & 0x000000FF) << 24);
+    ip->checksum = swap_uint16(calculate_checksum(ip, sizeof(IPv4Header))); // FIX: store in NBO
 }
 
 /**
@@ -135,26 +146,26 @@ __device__ inline void compute_tcp_checksum(IPv4Header* ip, TcpHeader* tcp) {
     uint32_t sum = 0;
 
     // Pseudo-header (RFC 793)
-    // Source & Dest IP
+    // Source & Dest IP (already in NBO in the struct)
     const uint8_t* src_ptr = (const uint8_t*)&ip->src_ip;
     const uint8_t* dest_ptr = (const uint8_t*)&ip->dest_ip;
 
-    sum += src_ptr[0] | (src_ptr[1] << 8);
-    sum += src_ptr[2] | (src_ptr[3] << 8);
-    sum += dest_ptr[0] | (dest_ptr[1] << 8);
-    sum += dest_ptr[2] | (dest_ptr[3] << 8);
+    sum += (uint16_t)((src_ptr[0] << 8) | src_ptr[1]); // FIX: BE accumulation
+    sum += (uint16_t)((src_ptr[2] << 8) | src_ptr[3]);
+    sum += (uint16_t)((dest_ptr[0] << 8) | dest_ptr[1]);
+    sum += (uint16_t)((dest_ptr[2] << 8) | dest_ptr[3]);
 
     // Protocol (6) și Zero
-    sum += swap_uint16((uint16_t)ip->protocol); 
+    sum += (uint16_t)ip->protocol; 
 
     // TCP Length
     uint16_t tcp_len = sizeof(TcpHeader); 
-    sum += swap_uint16(tcp_len);
+    sum += tcp_len;
 
     // Header-ul TCP
     const uint8_t* tcp_raw = (const uint8_t*)tcp;
     for (int i = 0; i < sizeof(TcpHeader); i += 2) {
-        sum += tcp_raw[i] | (tcp_raw[i+1] << 8);
+        sum += (uint16_t)((tcp_raw[i] << 8) | tcp_raw[i+1]); // FIX: BE accumulation
     }
 
     // Folding
@@ -162,7 +173,7 @@ __device__ inline void compute_tcp_checksum(IPv4Header* ip, TcpHeader* tcp) {
         sum = (sum & 0xFFFF) + (sum >> 16);
     }
 
-    tcp->checksum = (uint16_t)(~sum);
+    tcp->checksum = swap_uint16((uint16_t)(~sum)); // FIX: store in NBO
 }
 
 

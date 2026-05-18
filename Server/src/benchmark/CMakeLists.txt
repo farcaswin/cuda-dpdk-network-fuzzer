@@ -14,7 +14,6 @@ set(BENCHMARK_SOURCES
     HeavyPayloadGenerator.cpp
     HeavyPayloadGenerator.h
     IPacketGenerator.h
-    ICpuPacketGenerator.h
     CpuUtils.h
 )
 
